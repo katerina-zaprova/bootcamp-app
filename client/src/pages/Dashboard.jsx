@@ -223,17 +223,25 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <MetricCard label="Total Test Cases" value={metrics?.totalCases ?? '—'} />
+            <MetricCard
+              label="Total Test Cases"
+              value={metrics?.totalCases ?? '—'}
+              sub={metrics?.totalCases === 0 ? 'Add test cases to a suite to start tracking' : undefined}
+            />
             <MetricCard
               label="Pass Rate"
               value={metrics?.passRate != null ? `${metrics.passRate}%` : '—'}
-              sub={metrics?.passRate == null ? 'No completed runs yet' : undefined}
+              sub={metrics?.passRate == null ? 'Run a test suite to track your pass rate' : undefined}
             />
-            <MetricCard label="Open Bugs" value={metrics?.openBugs ?? '—'} />
+            <MetricCard
+              label="Open Bugs"
+              value={metrics?.openBugs ?? '—'}
+              sub={metrics?.openBugs === 0 ? 'No open bugs — all clear!' : undefined}
+            />
             <MetricCard
               label="Avg Run Duration"
               value={formatDuration(metrics?.avgDurationMs)}
-              sub={metrics?.avgDurationMs == null ? 'No timed runs yet' : undefined}
+              sub={metrics?.avgDurationMs == null ? 'Complete a run to see average timing' : undefined}
             />
           </>
         )}
@@ -282,8 +290,14 @@ export default function Dashboard() {
                   : runs.length === 0
                     ? (
                       <tr>
-                        <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: '#9ca3af', padding: '2rem' }}>
-                          No runs yet
+                        <td colSpan={4} style={{ padding: '2.5rem 1.25rem', textAlign: 'center', borderBottom: 'none' }}>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>▶</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                            No test runs yet
+                          </div>
+                          <div style={{ fontSize: 13, color: '#9ca3af' }}>
+                            Open a <Link to="/test-suites" style={{ color: '#6366f1' }}>test suite</Link> and click ▶ New Run to get started.
+                          </div>
                         </td>
                       </tr>
                     )
@@ -330,7 +344,17 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : activity.length === 0 ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>No activity yet</div>
+              <div style={{ padding: '2.5rem 1.25rem', textAlign: 'center' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🔔</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                  No activity yet
+                </div>
+                <div style={{ fontSize: 13, color: '#9ca3af' }}>
+                  Status updates, severity changes, and comments on{' '}
+                  <Link to="/bugs" style={{ color: '#6366f1' }}>bugs</Link>{' '}
+                  will appear here.
+                </div>
+              </div>
             ) : (
               <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                 {activity.map(item => (

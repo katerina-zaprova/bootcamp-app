@@ -6,6 +6,7 @@ import Bugs from './pages/Bugs';
 import BugDetail from './pages/BugDetail';
 import TestRuns from './pages/TestRuns';
 import TestRunDetail from './pages/TestRunDetail';
+import Dashboard from './pages/Dashboard';
 
 const navLink = ({ isActive }) => ({
   textDecoration: 'none',
@@ -20,6 +21,7 @@ export default function App() {
       <div style={{ fontFamily: 'system-ui, sans-serif', minHeight: '100vh', background: '#f9fafb' }}>
         <nav style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 2rem', display: 'flex', alignItems: 'center', gap: '1.5rem', height: 52 }}>
           <span style={{ fontWeight: 700, color: '#111' }}>Bootcamp App</span>
+          <NavLink to="/dashboard" style={navLink}>Dashboard</NavLink>
           <NavLink to="/test-cases" style={navLink}>Test Cases</NavLink>
           <NavLink to="/test-suites" style={navLink}>Test Suites</NavLink>
           <NavLink to="/test-runs" style={navLink}>Test Runs</NavLink>
@@ -27,6 +29,7 @@ export default function App() {
         </nav>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/test-cases" element={<TestCases />} />
           <Route path="/test-suites" element={<TestSuites />} />
           <Route path="/test-suites/:id" element={<TestSuiteDetail />} />
