@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/check-response-shape.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-severity-enum.sh"
           }
         ]
       }
