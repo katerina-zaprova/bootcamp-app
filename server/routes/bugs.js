@@ -118,7 +118,7 @@ function handleUpdateBug(req, res) {
   const existing = db.prepare('SELECT * FROM bugs WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ success: false, data: null, error: 'Bug not found.' });
 
-  const { title, description, severity, steps, expected, actual, environment } = req.body;
+  const { title, description, severity, steps, expected, actual, environment, gitlab_issue_url } = req.body;
   const newSeverity = severity ?? existing.severity;
 
   if (title !== undefined && !title.trim()) {
@@ -133,7 +133,7 @@ function handleUpdateBug(req, res) {
 
   db.prepare(`
     UPDATE bugs
-    SET title = ?, description = ?, severity = ?, steps = ?, expected = ?, actual = ?, environment = ?, updated_at = datetime('now')
+    SET title = ?, description = ?, severity = ?, steps = ?, expected = ?, actual = ?, environment = ?, gitlab_issue_url = ?, updated_at = datetime('now')
     WHERE id = ?
   `).run(
     title !== undefined ? title.trim() : existing.title,
@@ -143,6 +143,7 @@ function handleUpdateBug(req, res) {
     expected !== undefined ? (expected?.trim() || null) : existing.expected,
     actual !== undefined ? (actual?.trim() || null) : existing.actual,
     environment !== undefined ? (environment?.trim() || null) : existing.environment,
+    gitlab_issue_url !== undefined ? (gitlab_issue_url?.trim() || null) : existing.gitlab_issue_url,
     req.params.id,
   );
 

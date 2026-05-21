@@ -30,10 +30,17 @@ db.exec(`
     expected TEXT,
     actual TEXT,
     environment TEXT,
+    gitlab_issue_url TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )
 `);
+
+// Add gitlab_issue_url column to existing databases that predate the column
+const cols = db.prepare("PRAGMA table_info(bugs)").all().map(c => c.name);
+if (!cols.includes('gitlab_issue_url')) {
+  db.exec('ALTER TABLE bugs ADD COLUMN gitlab_issue_url TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS bug_activity (
