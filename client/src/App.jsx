@@ -4,6 +4,8 @@ import TestSuites from './pages/TestSuites';
 import TestSuiteDetail from './pages/TestSuiteDetail';
 import Bugs from './pages/Bugs';
 import BugDetail from './pages/BugDetail';
+import TestRuns from './pages/TestRuns';
+import TestRunDetail from './pages/TestRunDetail';
 
 const navLink = ({ isActive }) => ({
   textDecoration: 'none',
@@ -20,6 +22,7 @@ export default function App() {
           <span style={{ fontWeight: 700, color: '#111' }}>Bootcamp App</span>
           <NavLink to="/test-cases" style={navLink}>Test Cases</NavLink>
           <NavLink to="/test-suites" style={navLink}>Test Suites</NavLink>
+          <NavLink to="/test-runs" style={navLink}>Test Runs</NavLink>
           <NavLink to="/bugs" style={navLink}>Bugs</NavLink>
         </nav>
         <Routes>
@@ -29,6 +32,8 @@ export default function App() {
           <Route path="/test-suites/:id" element={<TestSuiteDetail />} />
           <Route path="/bugs" element={<Bugs />} />
           <Route path="/bugs/:id" element={<BugDetail />} />
+          <Route path="/test-runs" element={<TestRuns />} />
+          <Route path="/test-runs/:id" element={<TestRunDetail />} />
         </Routes>
       </div>
     </BrowserRouter>

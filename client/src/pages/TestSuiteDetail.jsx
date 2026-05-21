@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import SeverityBadge from '../components/SeverityBadge';
 import SuiteModal from '../components/SuiteModal';
 
@@ -7,6 +7,7 @@ const STATUS_COLOR = { draft: '#9ca3af', ready: '#3b82f6', 'in-progress': '#f59e
 
 export default function TestSuiteDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [suite, setSuite] = useState(null);
   const [cases, setCases] = useState([]);
   const [allCases, setAllCases] = useState([]);
@@ -16,6 +17,7 @@ export default function TestSuiteDetail() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [creatingRun, setCreatingRun] = useState(false);
   const dragIndex = useRef(null);
   const [dragOver, setDragOver] = useState(null);
 
@@ -79,6 +81,27 @@ export default function TestSuiteDetail() {
     saveCaseOrder(next, prev);
   }
 
+  async function handleNewRun() {
+    setCreatingRun(true);
+    try {
+      const res  = await fetch('/api/test-runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suite_id: parseInt(id, 10) }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        navigate(`/test-runs/${json.data.id}`);
+      } else {
+        setSaveError(json.error ?? 'Failed to create run.');
+        setCreatingRun(false);
+      }
+    } catch {
+      setSaveError('Could not reach the server.');
+      setCreatingRun(false);
+    }
+  }
+
   async function removeCase(caseId) {
     const prev = [...cases];
     const next = cases.filter(c => c.id !== caseId);
@@ -120,7 +143,12 @@ export default function TestSuiteDetail() {
             <span style={{ color: '#9ca3af' }}>{cases.length} case{cases.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
-        <button onClick={() => setEditOpen(true)} style={ghostBtn}>Edit suite</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={handleNewRun} disabled={creatingRun} style={{ ...ghostBtn, background: '#2563eb', color: '#fff', border: 'none' }}>
+            {creatingRun ? 'Creating…' : '▶ New Run'}
+          </button>
+          <button onClick={() => setEditOpen(true)} style={ghostBtn}>Edit suite</button>
+        </div>
       </div>
 
       {cases.length === 0 ? (

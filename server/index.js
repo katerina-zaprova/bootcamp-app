@@ -2,6 +2,7 @@ const express = require('express');
 const testCasesRouter = require('./routes/test-cases');
 const testSuitesRouter = require('./routes/test-suites');
 const bugsRouter = require('./routes/bugs');
+const testRunsRouter = require('./routes/test-runs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,6 +16,7 @@ app.get('/api/hello', (req, res) => {
 app.use('/api/test-cases', testCasesRouter);
 app.use('/api/test-suites', testSuitesRouter);
 app.use('/api/bugs', bugsRouter);
+app.use('/api/test-runs', testRunsRouter);
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);

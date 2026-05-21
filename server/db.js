@@ -43,6 +43,34 @@ if (!cols.includes('gitlab_issue_url')) {
 }
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS test_runs_v2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    suite_id INTEGER NOT NULL REFERENCES test_suites(id),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','running','passed','failed')),
+    pass_count INTEGER NOT NULL DEFAULT 0,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    skip_count INTEGER NOT NULL DEFAULT 0,
+    start_time TEXT,
+    end_time TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS test_run_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES test_runs_v2(id) ON DELETE CASCADE,
+    test_case_id INTEGER NOT NULL REFERENCES test_cases(id),
+    result TEXT CHECK(result IN ('passed','failed','skipped')),
+    duration_ms INTEGER,
+    notes TEXT,
+    failed_at TEXT,
+    github_issue_url TEXT
+  )
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS bug_activity (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bug_id INTEGER NOT NULL REFERENCES bugs(id) ON DELETE CASCADE,
@@ -186,6 +214,35 @@ if (bugCount === 0) {
     insertActivity.run({ bug_id: b3.lastInsertRowid, action: 'status_change', old_value: 'in-progress', new_value: 'resolved', message: null });
     insertActivity.run({ bug_id: b3.lastInsertRowid, action: 'comment', old_value: null, new_value: null, message: 'Sort state should be persisted in URL params so it survives navigation.' });
   })();
+}
+
+const { count: runCount } = db.prepare('SELECT COUNT(*) as count FROM test_runs_v2').get();
+if (runCount === 0) {
+  const firstSuite = db.prepare('SELECT id FROM test_suites ORDER BY id ASC LIMIT 1').get();
+  if (firstSuite) {
+    const suiteCases = db.prepare('SELECT test_case_id FROM suite_cases WHERE suite_id = ? ORDER BY sort_order ASC').all(firstSuite.id);
+    if (suiteCases.length >= 3) {
+      const base = Date.now() - 24 * 60 * 60 * 1000;
+      const startTime = new Date(base).toISOString();
+      const failedAt  = new Date(base + 11 * 60 * 1000).toISOString();
+      const endTime   = new Date(base + 12 * 60 * 1000).toISOString();
+      db.transaction(() => {
+        const run = db.prepare(`
+          INSERT INTO test_runs_v2 (suite_id, status, pass_count, fail_count, skip_count, start_time, end_time, created_by)
+          VALUES (?, 'failed', 1, 1, 1, ?, ?, 'demo')
+        `).run(firstSuite.id, startTime, endTime);
+        const rid = run.lastInsertRowid;
+        const insertResult = db.prepare(`
+          INSERT INTO test_run_results (run_id, test_case_id, result, duration_ms, notes, failed_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        insertResult.run(rid, suiteCases[0].test_case_id, 'passed',  1240, null, null);
+        insertResult.run(rid, suiteCases[1].test_case_id, 'failed',   890,
+          'Reset email not delivered within the 2-minute window.', failedAt);
+        insertResult.run(rid, suiteCases[2].test_case_id, 'skipped', null, 'Skipped — depends on passing login.', null);
+      })();
+    }
+  }
 }
 
 module.exports = db;
