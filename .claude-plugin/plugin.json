@@ -1,0 +1,64 @@
+{
+  "name": "bootcamp-app",
+  "version": "1.0.0",
+  "description": "Claude Code plugin for the TestDevLab bootcamp bug tracker and test management app. Provides slash commands for test and bug workflows, skills for test generation and QA review, subagents for delegated test writing and review, and hooks that enforce project conventions on every file write.",
+  "author": "Katerina Zaprova <katerina.zaprova@testdevlab.com>",
+  "commands": [
+    {
+      "name": "new-test",
+      "path": ".claude/commands/new-test.md",
+      "description": "Scaffold a new test case for a given feature or component and add it to the appropriate test suite."
+    },
+    {
+      "name": "bug-report",
+      "path": ".claude/commands/bug-report.md",
+      "description": "Create a structured bug report entry with title, description, severity, and reproduction steps."
+    }
+  ],
+  "skills": [
+    {
+      "name": "test-generator",
+      "path": ".claude/skills/test-generator/SKILL.md",
+      "description": "Generates test cases from a feature description or existing code. Covers happy path, edge cases, and failure modes."
+    },
+    {
+      "name": "qa-review",
+      "path": ".claude/skills/qa-review/SKILL.md",
+      "description": "Reviews a feature, change, or file from a QA perspective — identifies missing coverage, edge cases, and potential regressions."
+    }
+  ],
+  "agents": [
+    {
+      "name": "test-writer",
+      "path": ".claude/agents/test-writer.md",
+      "description": "Subagent that writes test case files. Dispatches automatically on requests to write or generate tests for a feature or flow."
+    },
+    {
+      "name": "qa-reviewer",
+      "path": ".claude/agents/qa-reviewer.md",
+      "description": "Subagent that performs QA review of code changes. Dispatches automatically on requests to review a feature from a testing perspective."
+    }
+  ],
+  "hooks": [
+    {
+      "name": "check-response-shape",
+      "path": ".claude/hooks/check-response-shape.sh",
+      "event": "PostToolUse",
+      "matcher": "Write|Edit",
+      "description": "Warns when a file under server/routes/ uses a res.json() call that is missing the required {success, data, error} envelope defined in CLAUDE.md."
+    },
+    {
+      "name": "check-severity-enum",
+      "path": ".claude/hooks/check-severity-enum.sh",
+      "event": "PostToolUse",
+      "matcher": "Write|Edit",
+      "description": "Warns when a JS/TS/JSX/TSX file contains a quoted severity word outside the project enum (Critical | Major | Minor | Trivial). Catches stray values like 'high', 'medium', 'low', 'blocker', 'cosmetic'."
+    },
+    {
+      "name": "session-summary",
+      "path": ".claude/hooks/session-summary.sh",
+      "event": "Stop",
+      "description": "Prints a session summary to the terminal when Claude Code exits: current date/time and a list of every file written or edited during the session."
+    }
+  ]
+}
