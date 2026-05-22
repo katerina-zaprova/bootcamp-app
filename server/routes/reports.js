@@ -135,26 +135,38 @@ function generateHtml(report) {
     ? Math.round((report.passed_count / report.total_count) * 100)
     : 0;
 
+  const overallPassed = report.failed_count === 0 && report.total_count > 0;
+  const statusLabel   = report.total_count === 0 ? 'NO RESULTS'
+    : overallPassed ? 'PASSED' : 'FAILED';
+  const statusCls     = report.total_count === 0 ? 'status-pending'
+    : overallPassed ? 'status-passed' : 'status-failed';
+
+  const passRateColor = passRate === 100 ? '#16a34a'
+    : passRate >= 70 ? '#d97706'
+    : '#dc2626';
+
   const rows = results.map(r => {
-    const cls = r.result === 'failed' ? ' class="row-failed"' : '';
+    const rowCls = r.result === 'failed' ? ' class="row-failed"'
+      : r.result === 'skipped' ? ' class="row-skipped"' : '';
+
     const badge = {
-      passed:  '<span class="badge badge-passed">&#10003; Passed</span>',
-      failed:  '<span class="badge badge-failed">&#10007; Failed</span>',
-      skipped: '<span class="badge badge-skipped">&#8722; Skipped</span>',
-      pending: '<span class="badge badge-pending">&#9675; Pending</span>',
-    }[r.result] ?? '<span class="badge badge-pending">&#9675; Pending</span>';
+      passed:  '<span class="badge badge-passed">&#10003;&nbsp;Passed</span>',
+      failed:  '<span class="badge badge-failed">&#10007;&nbsp;Failed</span>',
+      skipped: '<span class="badge badge-skipped">&#8722;&nbsp;Skipped</span>',
+      pending: '<span class="badge badge-pending">&#9675;&nbsp;Pending</span>',
+    }[r.result] ?? '<span class="badge badge-pending">&#9675;&nbsp;Pending</span>';
 
     const ghLink = r.github_issue_url
-      ? `<br><a href="${escHtml(r.github_issue_url)}" class="gh-link">GitHub issue ↗</a>`
+      ? `<div style="margin-top:3px"><a href="${escHtml(r.github_issue_url)}" class="gh-link">&#128279;&nbsp;GitHub issue</a></div>`
       : '';
 
     return `
-      <tr${cls}>
+      <tr${rowCls}>
         <td class="col-num">${r.index}</td>
-        <td>${escHtml(r.title)}</td>
+        <td class="col-title">${escHtml(r.title)}</td>
         <td class="col-result">${badge}</td>
         <td class="col-dur">${fmtDuration(r.duration_ms)}</td>
-        <td class="col-notes">${r.notes ? escHtml(r.notes) : '—'}${ghLink}</td>
+        <td class="col-notes">${r.notes ? escHtml(r.notes) : '<span class="muted">—</span>'}${ghLink}</td>
       </tr>`;
   }).join('');
 
@@ -165,109 +177,232 @@ function generateHtml(report) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Test Report — ${escHtml(report.suite_name)}</title>
   <style>
+    /* ── Reset ───────────────────────────────────────────────────────────── */
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+    /* ── Base ────────────────────────────────────────────────────────────── */
     body{
-      font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,sans-serif;
-      font-size:14px;color:#111827;background:#fff;
-      padding:2.5rem 3rem;max-width:980px;margin:0 auto;
+      font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      font-size:14px;line-height:1.5;color:#111827;background:#f8fafc;
+    }
+    a{color:#4f46e5;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .muted{color:#9ca3af}
+
+    /* ── Page wrapper ────────────────────────────────────────────────────── */
+    .page{
+      max-width:900px;margin:2rem auto;background:#fff;
+      border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;
     }
 
-    /* ── Header ─────────────────────────────────────────────────────────── */
-    .hd-title{font-size:22px;font-weight:700;margin-bottom:.25rem}
-    .hd-meta{font-size:13px;color:#6b7280;margin-bottom:1.5rem}
+    /* ── Top banner ──────────────────────────────────────────────────────── */
+    .banner{
+      background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);
+      padding:.6rem 2rem;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .banner-project{
+      font-size:13px;font-weight:700;color:#c7d2fe;letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .banner-label{
+      font-size:12px;font-weight:600;color:#a5b4fc;letter-spacing:.08em;
+      text-transform:uppercase;
+    }
 
-    /* ── Summary cards ───────────────────────────────────────────────────── */
-    .summary{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem}
-    .card{flex:1 1 90px;border-radius:8px;padding:.75rem 1rem;text-align:center;border:1px solid #e5e7eb}
-    .card .n{font-size:26px;font-weight:700;line-height:1.1}
-    .card .lbl{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+    /* ── Report header ───────────────────────────────────────────────────── */
+    .report-header{
+      padding:1.75rem 2rem 1.5rem;
+      border-bottom:1px solid #e5e7eb;
+      display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;
+    }
+    .rh-left h1{
+      font-size:20px;font-weight:700;color:#111827;margin-bottom:.4rem;
+      line-height:1.25;
+    }
+    .rh-meta{font-size:13px;color:#6b7280}
+    .rh-meta span+span::before{content:'·';margin:0 .5rem;color:#d1d5db}
+
+    /* ── Status badge ────────────────────────────────────────────────────── */
+    .status-badge{
+      display:inline-block;padding:.35rem .9rem;border-radius:6px;
+      font-size:13px;font-weight:700;letter-spacing:.06em;white-space:nowrap;
+      flex-shrink:0;margin-top:.2rem;
+    }
+    .status-passed{background:#dcfce7;color:#15803d;border:1px solid #86efac}
+    .status-failed{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}
+    .status-pending{background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db}
+
+    /* ── Summary section ─────────────────────────────────────────────────── */
+    .summary-section{padding:1.5rem 2rem;border-bottom:1px solid #e5e7eb}
+    .cards{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem}
+    .card{
+      flex:1 1 100px;border-radius:8px;padding:.9rem 1rem 1rem;
+      text-align:center;border:1px solid #e5e7eb;
+    }
+    .card .n{font-size:28px;font-weight:700;line-height:1;margin-bottom:.25rem}
+    .card .lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#6b7280}
     .card-pass{background:#f0fdf4;border-color:#86efac}.card-pass .n{color:#16a34a}
     .card-fail{background:#fef2f2;border-color:#fca5a5}.card-fail .n{color:#dc2626}
-    .card-skip{background:#f9fafb;border-color:#d1d5db}.card-skip .n{color:#6b7280}
+    .card-skip{background:#fffbeb;border-color:#fcd34d}.card-skip .n{color:#d97706}
     .card-tot {background:#eff6ff;border-color:#bfdbfe}.card-tot  .n{color:#1d4ed8}
-    .pass-rate{font-size:15px;font-weight:600;color:#374151;margin-bottom:2rem}
-    .pass-rate em{font-style:normal;color:#16a34a}
 
-    /* ── Table ───────────────────────────────────────────────────────────── */
+    /* ── Pass rate bar ───────────────────────────────────────────────────── */
+    .pr-row{display:flex;align-items:center;gap:1rem}
+    .pr-label{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;
+              letter-spacing:.05em;white-space:nowrap;width:70px}
+    .pr-track{flex:1;height:10px;background:#e5e7eb;border-radius:99px;overflow:hidden}
+    .pr-fill {height:100%;border-radius:99px;background:${passRateColor};
+              width:${passRate}%;transition:width .3s}
+    .pr-value{font-size:15px;font-weight:700;color:${passRateColor};width:46px;text-align:right}
+
+    /* ── Results table ───────────────────────────────────────────────────── */
+    .table-wrap{padding:0}
     table{width:100%;border-collapse:collapse;font-size:13px}
-    thead{background:#f9fafb}
-    th{
-      padding:9px 12px;text-align:left;font-size:11px;font-weight:600;
-      color:#6b7280;text-transform:uppercase;letter-spacing:.05em;
-      border-bottom:2px solid #e5e7eb
+    .table-heading{
+      padding:1rem 2rem .75rem;font-size:11px;font-weight:700;
+      color:#6b7280;text-transform:uppercase;letter-spacing:.06em;
+      border-bottom:1px solid #e5e7eb;
     }
-    td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+    thead tr{background:#f9fafb}
+    th{
+      padding:9px 14px;text-align:left;font-size:11px;font-weight:600;
+      color:#6b7280;text-transform:uppercase;letter-spacing:.05em;
+      border-bottom:2px solid #e5e7eb;white-space:nowrap;
+    }
+    td{padding:11px 14px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#374151}
     tr:last-child td{border-bottom:none}
-    .col-num{width:36px;color:#9ca3af}
-    .col-result{width:110px}
-    .col-dur{width:90px;color:#6b7280;white-space:nowrap}
-    .col-notes{color:#6b7280;font-size:12px}
-    .row-failed{background:#fff7f7}
+    .col-num  {width:36px;color:#9ca3af;font-size:12px}
+    .col-title{font-weight:500;color:#111827}
+    .col-result{width:115px}
+    .col-dur  {width:90px;color:#6b7280;white-space:nowrap;font-size:12px}
+    .col-notes{color:#6b7280;font-size:12px;max-width:220px}
+    .row-failed {background:#fff5f5}
+    .row-skipped{background:#fefce8}
 
     /* ── Badges ──────────────────────────────────────────────────────────── */
-    .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}
-    .badge-passed {background:#dcfce7;color:#16a34a}
-    .badge-failed {background:#fee2e2;color:#dc2626}
-    .badge-skipped{background:#f3f4f6;color:#6b7280}
+    .badge{
+      display:inline-block;padding:3px 9px;border-radius:5px;
+      font-size:12px;font-weight:600;white-space:nowrap;
+    }
+    .badge-passed {background:#dcfce7;color:#15803d}
+    .badge-failed {background:#fee2e2;color:#b91c1c}
+    .badge-skipped{background:#fef9c3;color:#a16207}
     .badge-pending{background:#f3f4f6;color:#9ca3af}
-    .gh-link{font-size:11px;color:#6366f1;text-decoration:none}
-    .gh-link:hover{text-decoration:underline}
+    .gh-link{font-size:11px;color:#4f46e5}
 
     /* ── Footer ──────────────────────────────────────────────────────────── */
-    .footer{
-      margin-top:2rem;padding-top:1rem;border-top:1px solid #e5e7eb;
-      font-size:12px;color:#9ca3af
+    .report-footer{
+      padding:1rem 2rem;border-top:1px solid #e5e7eb;background:#f9fafb;
+      display:flex;align-items:center;justify-content:space-between;
+      font-size:12px;color:#9ca3af;
     }
+    .footer-left{display:flex;gap:.5rem;align-items:center}
+    .footer-dot{color:#d1d5db}
 
     /* ── Print ───────────────────────────────────────────────────────────── */
     @media print{
-      body{padding:1cm 1.5cm;font-size:11px}
-      .hd-meta{margin-bottom:1rem}
-      .summary{gap:.5rem}
-      .card{padding:.5rem .75rem}
-      .card .n{font-size:20px}
+      body{background:#fff;font-size:11px}
+      .page{margin:0;border:none;border-radius:0;box-shadow:none}
+      .banner{background:#4f46e5!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .card-pass,.card-fail,.card-skip,.card-tot,
+      .row-failed,.row-skipped,
+      .badge-passed,.badge-failed,.badge-skipped,.badge-pending,
+      .status-passed,.status-failed,.pr-fill{
+        -webkit-print-color-adjust:exact;print-color-adjust:exact
+      }
+      .cards{gap:.5rem}
+      .card{padding:.6rem .75rem}
+      .card .n{font-size:22px}
       table{font-size:10px}
-      th,td{padding:6px 8px}
+      th,td{padding:6px 10px}
       tr{page-break-inside:avoid}
       thead{display:table-header-group}
-      -webkit-print-color-adjust:exact;
-      print-color-adjust:exact;
-      .card-pass,.card-fail,.card-skip,.card-tot,.row-failed{
-        -webkit-print-color-adjust:exact
-      }
+      .pr-fill{print-color-adjust:exact}
     }
   </style>
 </head>
 <body>
-  <h1 class="hd-title">${escHtml(report.suite_name)}</h1>
-  <p class="hd-meta">
-    Run date: ${fmtDate(report.run_date)}&nbsp;&nbsp;·&nbsp;&nbsp;Generated: ${fmtDate(report.generated_at)}
-  </p>
+<div class="page">
 
-  <div class="summary">
-    <div class="card card-pass"><div class="n">${report.passed_count}</div><div class="lbl">Passed</div></div>
-    <div class="card card-fail"><div class="n">${report.failed_count}</div><div class="lbl">Failed</div></div>
-    <div class="card card-skip"><div class="n">${report.skipped_count}</div><div class="lbl">Skipped</div></div>
-    <div class="card card-tot" ><div class="n">${report.total_count}</div> <div class="lbl">Total</div></div>
+  <!-- Top banner -->
+  <div class="banner">
+    <span class="banner-project">bootcamp&#8209;app</span>
+    <span class="banner-label">Test Report</span>
   </div>
-  <p class="pass-rate">Pass rate: <em>${passRate}%</em></p>
 
-  <table>
-    <thead>
-      <tr>
-        <th class="col-num">#</th>
-        <th>Test Case</th>
-        <th class="col-result">Result</th>
-        <th class="col-dur">Duration</th>
-        <th>Notes</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:2rem 0">No results recorded</td></tr>'}
-    </tbody>
-  </table>
+  <!-- Report header -->
+  <div class="report-header">
+    <div class="rh-left">
+      <h1>${escHtml(report.suite_name)}</h1>
+      <div class="rh-meta">
+        <span>Run date: ${fmtDate(report.run_date)}</span>
+        <span>Run #${report.run_id}</span>
+        <span>Report #${report.id}</span>
+      </div>
+    </div>
+    <div class="status-badge ${statusCls}">${statusLabel}</div>
+  </div>
 
-  <p class="footer">Report #${report.id} &nbsp;·&nbsp; bootcamp-app &nbsp;·&nbsp; ${fmtDate(report.generated_at)}</p>
+  <!-- Summary cards + pass rate -->
+  <div class="summary-section">
+    <div class="cards">
+      <div class="card card-pass">
+        <div class="n">${report.passed_count}</div>
+        <div class="lbl">Passed</div>
+      </div>
+      <div class="card card-fail">
+        <div class="n">${report.failed_count}</div>
+        <div class="lbl">Failed</div>
+      </div>
+      <div class="card card-skip">
+        <div class="n">${report.skipped_count}</div>
+        <div class="lbl">Skipped</div>
+      </div>
+      <div class="card card-tot">
+        <div class="n">${report.total_count}</div>
+        <div class="lbl">Total</div>
+      </div>
+    </div>
+    <div class="pr-row">
+      <div class="pr-label">Pass rate</div>
+      <div class="pr-track"><div class="pr-fill"></div></div>
+      <div class="pr-value">${passRate}%</div>
+    </div>
+  </div>
+
+  <!-- Results table -->
+  <div class="table-wrap">
+    <div class="table-heading">Test Case Results</div>
+    <table>
+      <thead>
+        <tr>
+          <th class="col-num">#</th>
+          <th>Test Case</th>
+          <th class="col-result">Result</th>
+          <th class="col-dur">Duration</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:2.5rem 0">No results recorded for this run.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer -->
+  <div class="report-footer">
+    <div class="footer-left">
+      <strong style="color:#6b7280">bootcamp-app</strong>
+      <span class="footer-dot">·</span>
+      <span>Report #${report.id}</span>
+      <span class="footer-dot">·</span>
+      <span>Run #${report.run_id}</span>
+    </div>
+    <div>Generated: ${fmtDate(report.generated_at)}</div>
+  </div>
+
+</div>
 </body>
 </html>`;
 }

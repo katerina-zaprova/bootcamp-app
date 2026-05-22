@@ -8,7 +8,14 @@ const VALID_STATUSES = ['draft', 'ready', 'passed', 'failed', 'skipped'];
 const VALID_SORT_FIELDS = ['updated_at', 'created_at', 'title', 'severity', 'status'];
 
 function parseRow(row) {
-  return { ...row, steps: JSON.parse(row.steps) };
+  let steps;
+  try {
+    const parsed = JSON.parse(row.steps);
+    steps = Array.isArray(parsed) ? parsed : [String(parsed)];
+  } catch {
+    steps = row.steps ? [row.steps] : [];
+  }
+  return { ...row, steps };
 }
 
 function handleGetTestCases(req, res) {
@@ -126,6 +133,57 @@ function handleUpdateTestCase(req, res) {
   res.json({ success: true, data: parseRow(updated), error: null });
 }
 
+function csvCell(val) {
+  const s = val == null ? '' : String(val);
+  // Wrap in quotes if the value contains a comma, double-quote, or newline
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+function handleExportCSV(req, res) {
+  const { status, search } = req.query;
+
+  if (status && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ success: false, data: null, error: 'Invalid status filter.' });
+  }
+
+  const conditions = [];
+  const params = [];
+  if (status) { conditions.push('status = ?'); params.push(status); }
+  if (search)  { conditions.push('title LIKE ?'); params.push(`%${search}%`); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const rows = db.prepare(`SELECT * FROM test_cases ${where} ORDER BY updated_at DESC`).all(...params);
+
+  const HEADERS = ['title', 'severity', 'status', 'steps', 'description', 'expected_result'];
+  const lines = [HEADERS.join(',')];
+
+  for (const row of rows) {
+    let steps = '';
+    try {
+      const parsed = JSON.parse(row.steps);
+      steps = Array.isArray(parsed) ? parsed.join(' | ') : String(parsed);
+    } catch {
+      steps = row.steps ?? '';
+    }
+    lines.push([
+      csvCell(row.title),
+      csvCell(row.severity),
+      csvCell(row.status),
+      csvCell(steps),
+      csvCell(row.preconditions ?? ''),
+      csvCell(row.expected_result),
+    ].join(','));
+  }
+
+  const filename = `test-cases${status ? '-' + status : ''}${search ? '-search' : ''}.csv`;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send('﻿' + lines.join('\r\n'));
+}
+
 function handleDeleteTestCase(req, res) {
   const existing = db.prepare('SELECT * FROM test_cases WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ success: false, data: null, error: 'Test case not found.' });
@@ -133,6 +191,7 @@ function handleDeleteTestCase(req, res) {
   res.json({ success: true, data: null, error: null });
 }
 
+router.get('/export', handleExportCSV);
 router.get('/', handleGetTestCases);
 router.get('/:id', handleGetTestCase);
 router.post('/', handleCreateTestCase);

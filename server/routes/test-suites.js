@@ -6,7 +6,14 @@ const router = express.Router();
 const VALID_STATUSES = ['draft', 'ready', 'in-progress', 'passed', 'failed'];
 
 function parseCaseRow(row) {
-  return { ...row, steps: JSON.parse(row.steps) };
+  let steps;
+  try {
+    const parsed = JSON.parse(row.steps);
+    steps = Array.isArray(parsed) ? parsed : [String(parsed)];
+  } catch {
+    steps = row.steps ? [row.steps] : [];
+  }
+  return { ...row, steps };
 }
 
 function handleGetTestSuites(req, res) {

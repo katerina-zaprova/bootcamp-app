@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SeverityBadge from '../components/SeverityBadge';
 import BugModal from '../components/BugModal';
+import { usePreferences } from '../context/PreferencesContext';
 
 const STATUS_STYLE = {
   'open':        { bg: '#fee2e2', text: '#b91c1c' },
@@ -22,6 +23,7 @@ function StatusBadge({ status }) {
 
 export default function Bugs() {
   const navigate = useNavigate();
+  const { prefs } = usePreferences();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -185,6 +187,7 @@ export default function Bugs() {
         <BugModal
           onClose={() => setModalOpen(false)}
           onSaved={bug => { setModalOpen(false); navigate(`/bugs/${bug.id}`); }}
+          defaultSeverity={prefs.default_severity_for_new_bugs}
         />
       )}
     </div>

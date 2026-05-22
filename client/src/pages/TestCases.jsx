@@ -104,7 +104,10 @@ export default function TestCases() {
           Test Cases{' '}
           <span style={{ fontSize: '0.9rem', color: '#6b7280', fontWeight: 400 }}>({total})</span>
         </h1>
-        <button onClick={openCreate} style={primaryBtn}>+ New test case</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href={exportHref(statusFilter, search)} download style={ghostBtn}>⬇ Download CSV</a>
+          <button onClick={openCreate} style={primaryBtn}>+ New test case</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -191,6 +194,14 @@ function Th({ children, onClick, style }) {
       {children}
     </th>
   );
+}
+
+function exportHref(statusFilter, search) {
+  const q = new URLSearchParams();
+  if (statusFilter) q.set('status', statusFilter);
+  if (search)       q.set('search', search);
+  const qs = q.toString();
+  return `/api/test-cases/export${qs ? '?' + qs : ''}`;
 }
 
 function fmt(str) {

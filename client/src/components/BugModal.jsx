@@ -2,11 +2,11 @@ import { useState } from 'react';
 
 const SEVERITIES = ['Critical', 'Major', 'Minor', 'Trivial'];
 
-export default function BugModal({ initial, onClose, onSaved }) {
+export default function BugModal({ initial, onClose, onSaved, defaultSeverity }) {
   const [form, setForm] = useState({
     title: initial?.title ?? '',
     description: initial?.description ?? '',
-    severity: initial?.severity ?? 'Major',
+    severity: initial?.severity ?? defaultSeverity ?? 'Major',
     steps: initial?.steps?.length ? [...initial.steps] : [''],
     expected: initial?.expected ?? '',
     actual: initial?.actual ?? '',

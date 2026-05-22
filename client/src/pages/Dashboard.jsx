@@ -121,6 +121,299 @@ function SkeletonRow({ cols }) {
   );
 }
 
+// ── SVG chart helpers ──────────────────────────────────────────────────────────
+
+function polarToCartesian(cx, cy, r, deg) {
+  const rad = (deg - 90) * (Math.PI / 180);
+  return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+}
+
+function arcPath(cx, cy, r, startDeg, endDeg) {
+  const end = Math.min(endDeg, startDeg + 359.99);
+  const [sx, sy] = polarToCartesian(cx, cy, r, startDeg);
+  const [ex, ey] = polarToCartesian(cx, cy, r, end);
+  const large = (end - startDeg) > 180 ? 1 : 0;
+  return `M ${sx} ${sy} A ${r} ${r} 0 ${large} 1 ${ex} ${ey}`;
+}
+
+function LegendItem({ color, label, count }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: '#374151' }}>{label}</span>
+      <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 'auto', paddingLeft: 8 }}>{count}</span>
+    </div>
+  );
+}
+
+function DonutChart({ passed, failed, skipped }) {
+  const total = passed + failed + skipped;
+  const cx = 62, cy = 62, r = 46, sw = 14;
+
+  if (total === 0) {
+    return (
+      <svg width={124} height={124}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fill="#9ca3af">No data</text>
+      </svg>
+    );
+  }
+
+  const passRate = Math.round((passed / total) * 100);
+  const rateColor = passRate >= 80 ? '#16a34a' : passRate >= 50 ? '#d97706' : '#dc2626';
+
+  const segments = [];
+  let cursor = 0;
+  const addSeg = (count, color) => {
+    if (count <= 0) return;
+    const span = (count / total) * 360;
+    segments.push({ d: arcPath(cx, cy, r, cursor, cursor + span), color });
+    cursor += span;
+  };
+  addSeg(passed, '#16a34a');
+  addSeg(failed, '#dc2626');
+  addSeg(skipped, '#d97706');
+
+  return (
+    <svg width={124} height={124}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+      {segments.map((seg, i) => (
+        <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
+      ))}
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight="700" fill={rateColor}>{passRate}%</text>
+      <text x={cx} y={cy + 11} textAnchor="middle" fontSize={10} fill="#9ca3af">pass rate</text>
+    </svg>
+  );
+}
+
+function TrendChart({ runs }) {
+  const data = [...runs].reverse();
+  const W = 360, H = 124;
+  const padL = 30, padR = 10, padT = 14, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  if (data.length === 0) {
+    return (
+      <div style={{ width: '100%', height: H, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>
+        No runs yet
+      </div>
+    );
+  }
+
+  const barW = Math.max(8, Math.min(36, chartW / data.length - 6));
+  const spacing = chartW / data.length;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', overflow: 'visible' }}>
+      {[0, 50, 100].map(v => {
+        const y = padT + chartH - (v / 100) * chartH;
+        return (
+          <g key={v}>
+            <line x1={padL} x2={padL + chartW} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={1} />
+            <text x={padL - 4} y={y + 3.5} textAnchor="end" fontSize={9} fill="#9ca3af">{v}%</text>
+          </g>
+        );
+      })}
+      <line x1={padL} x2={padL + chartW} y1={padT + chartH} y2={padT + chartH} stroke="#e5e7eb" strokeWidth={1} />
+      {data.map((run, i) => {
+        const tot = run.pass_count + run.fail_count + run.skip_count;
+        const rate = tot > 0 ? run.pass_count / tot : 0;
+        const bh = Math.max(rate * chartH, tot > 0 ? 2 : 0);
+        const x = padL + i * spacing + (spacing - barW) / 2;
+        const y = padT + chartH - bh;
+        const color = rate >= 0.8 ? '#16a34a' : rate >= 0.5 ? '#d97706' : '#dc2626';
+        return (
+          <g key={run.id}>
+            {bh > 0 && <rect x={x} y={y} width={barW} height={bh} fill={color} rx={2} opacity={0.85} />}
+            <text x={x + barW / 2} y={H - 6} textAnchor="middle" fontSize={9} fill="#9ca3af">#{run.id}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Coverage colours (status → hex) ──────────────────────────────────────────
+const COVERAGE_COLOR = {
+  passed:   '#16a34a',
+  failed:   '#dc2626',
+  skipped:  '#d97706',
+  pending:  '#6b7280',
+  untested: '#cbd5e1',
+};
+
+// ── Pass-rate line chart ───────────────────────────────────────────────────────
+function PassRateLineChart({ data }) {
+  const VW = 320, VH = 140;
+  const pL = 34, pR = 12, pT = 14, pB = 32;
+  const cW = VW - pL - pR, cH = VH - pT - pB;
+
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height: VH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>
+        No completed runs yet
+      </div>
+    );
+  }
+
+  const n = data.length;
+  const xStep = n < 2 ? cW : cW / (n - 1);
+  const pts = data.map((d, i) => [
+    pL + (n < 2 ? cW / 2 : i * xStep),
+    pT + cH - (d.pass_rate / 100) * cH,
+  ]);
+
+  const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+  const areaPath = `M ${pts[0][0].toFixed(1)} ${(pT + cH).toFixed(1)} `
+    + pts.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+    + ` L ${pts[pts.length - 1][0].toFixed(1)} ${(pT + cH).toFixed(1)} Z`;
+
+  const fmtXLabel = iso => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
+
+  const yTicks = [0, 25, 50, 75, 100];
+  const labelStep = Math.max(1, Math.ceil(n / 6));
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id="lineArea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {yTicks.map(v => {
+        const y = pT + cH - (v / 100) * cH;
+        return (
+          <g key={v}>
+            <line x1={pL} x2={pL + cW} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={0.8} />
+            <text x={pL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="#9ca3af">{v}%</text>
+          </g>
+        );
+      })}
+      <line x1={pL} x2={pL + cW} y1={pT + cH} y2={pT + cH} stroke="#e5e7eb" strokeWidth={0.8} />
+      <path d={areaPath} fill="url(#lineArea)" />
+      <path d={linePath} fill="none" stroke="#6366f1" strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map(([x, y], i) => {
+        const rate = data[i].pass_rate;
+        const color = rate >= 80 ? '#16a34a' : rate >= 50 ? '#d97706' : '#dc2626';
+        return (
+          <g key={i}>
+            <circle cx={x} cy={y} r={3} fill="#fff" stroke={color} strokeWidth={1.5} />
+            {i % labelStep === 0 && (
+              <text x={x} y={VH - 4} textAnchor="middle" fontSize={7.5} fill="#9ca3af">
+                {fmtXLabel(data[i].created_at)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Bugs opened vs closed grouped bar chart ────────────────────────────────────
+function BugsWeeklyChart({ data }) {
+  const VW = 320, VH = 140;
+  const pL = 28, pR = 8, pT = 14, pB = 32;
+  const cW = VW - pL - pR, cH = VH - pT - pB;
+
+  const isEmpty = !data || data.length === 0 || data.every(w => w.opened === 0 && w.closed === 0);
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ height: VH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>
+        No bug data yet
+      </div>
+    );
+  }
+
+  const maxVal = Math.max(1, ...data.flatMap(w => [w.opened, w.closed]));
+  const n = data.length;
+  const groupW = cW / n;
+  const barW = Math.max(3, Math.min(12, (groupW - 4) / 2));
+  const yTicks = [0, Math.ceil(maxVal / 2), maxVal];
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${VW} ${VH}`} style={{ overflow: 'visible' }}>
+      {yTicks.map(v => {
+        const y = pT + cH - (v / maxVal) * cH;
+        return (
+          <g key={v}>
+            <line x1={pL} x2={pL + cW} y1={y} y2={y} stroke="#f1f5f9" strokeWidth={0.8} />
+            <text x={pL - 4} y={y + 4} textAnchor="end" fontSize={8} fill="#9ca3af">{v}</text>
+          </g>
+        );
+      })}
+      <line x1={pL} x2={pL + cW} y1={pT + cH} y2={pT + cH} stroke="#e5e7eb" strokeWidth={0.8} />
+      {data.map((w, i) => {
+        const gx = pL + i * groupW + (groupW - barW * 2 - 2) / 2;
+        const oh = (w.opened / maxVal) * cH;
+        const ch = (w.closed / maxVal) * cH;
+        return (
+          <g key={w.week_start}>
+            {w.opened > 0 && <rect x={gx} y={pT + cH - oh} width={barW} height={oh} fill="#6366f1" rx={1.5} opacity={0.85} />}
+            {w.closed > 0 && <rect x={gx + barW + 2} y={pT + cH - ch} width={barW} height={ch} fill="#16a34a" rx={1.5} opacity={0.85} />}
+            <text x={gx + barW + 1} y={VH - 4} textAnchor="middle" fontSize={7} fill="#9ca3af">{w.week_label}</text>
+          </g>
+        );
+      })}
+      {/* Legend */}
+      <g>
+        <rect x={pL} y={3} width={7} height={7} fill="#6366f1" rx={1} />
+        <text x={pL + 9} y={10} fontSize={8} fill="#6b7280">Opened</text>
+        <rect x={pL + 52} y={3} width={7} height={7} fill="#16a34a" rx={1} />
+        <text x={pL + 61} y={10} fontSize={8} fill="#6b7280">Closed</text>
+      </g>
+    </svg>
+  );
+}
+
+// ── Coverage donut (by latest test-case result) ────────────────────────────────
+function CoverageDonutChart({ data }) {
+  const cx = 58, cy = 58, r = 44, sw = 13;
+  const order = ['passed', 'failed', 'skipped', 'pending', 'untested'];
+
+  const sorted = order
+    .map(s => data?.find(d => d.status === s))
+    .filter(Boolean)
+    .concat((data ?? []).filter(d => !order.includes(d.status)));
+
+  const total = sorted.reduce((s, d) => s + d.count, 0);
+
+  if (total === 0) {
+    return (
+      <svg width={116} height={116}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={11} fill="#9ca3af">No data</text>
+      </svg>
+    );
+  }
+
+  const segments = [];
+  let cursor = 0;
+  for (const d of sorted) {
+    if (d.count <= 0) continue;
+    const span = (d.count / total) * 360;
+    segments.push({ d: arcPath(cx, cy, r, cursor, cursor + span), color: COVERAGE_COLOR[d.status] ?? '#e5e7eb' });
+    cursor += span;
+  }
+
+  return (
+    <svg width={116} height={116}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f3f4f6" strokeWidth={sw} />
+      {segments.map((seg, i) => (
+        <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth={sw} strokeLinecap="butt" />
+      ))}
+      <text x={cx} y={cy - 5} textAnchor="middle" fontSize={17} fontWeight="700" fill="#111827">{total}</text>
+      <text x={cx} y={cy + 11} textAnchor="middle" fontSize={9} fill="#9ca3af">test cases</text>
+    </svg>
+  );
+}
+
 const tableStyle = {
   width: '100%',
   borderCollapse: 'collapse',
@@ -148,6 +441,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [trends, setTrends] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -163,15 +457,28 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchTrends = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/trends');
+      const json = await res.json();
+      if (json.success) setTrends(json.data);
+    } catch (_) { /* non-fatal */ }
+  }, []);
+
   useEffect(() => {
     fetchData();
-    const timer = setInterval(fetchData, REFRESH_MS);
+    fetchTrends();
+    const timer = setInterval(() => { fetchData(); fetchTrends(); }, REFRESH_MS);
     return () => clearInterval(timer);
-  }, [fetchData]);
+  }, [fetchData, fetchTrends]);
 
   const metrics = data?.metrics;
   const runs = data?.recentRuns ?? [];
   const activity = data?.recentActivity ?? [];
+
+  const totalPassed  = runs.reduce((s, r) => s + r.pass_count, 0);
+  const totalFailed  = runs.reduce((s, r) => s + r.fail_count, 0);
+  const totalSkipped = runs.reduce((s, r) => s + r.skip_count, 0);
 
   const isEmpty = !loading && !error && data &&
     runs.length === 0 && activity.length === 0 && metrics?.totalCases === 0;
@@ -246,6 +553,79 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Charts row */}
+      {!loading && !isEmpty && (
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+
+          {/* Donut — result distribution */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem 1.25rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Result Distribution
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <DonutChart passed={totalPassed} failed={totalFailed} skipped={totalSkipped} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                <LegendItem color="#16a34a" label="Passed"  count={totalPassed} />
+                <LegendItem color="#dc2626" label="Failed"  count={totalFailed} />
+                <LegendItem color="#d97706" label="Skipped" count={totalSkipped} />
+              </div>
+            </div>
+          </div>
+
+          {/* Bar — pass rate per run */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem 1.25rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Pass Rate Trend — last {runs.length} run{runs.length !== 1 ? 's' : ''}
+            </div>
+            <TrendChart runs={runs} />
+          </div>
+
+        </div>
+      )}
+
+      {/* Trends charts row */}
+      {trends && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 220px', gap: '1rem', marginBottom: '1.5rem' }}>
+
+          {/* Line chart — pass rate over last 10 runs */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem 1.25rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Pass Rate Trend — last 10 runs
+            </div>
+            <PassRateLineChart data={trends.passRateTrend} />
+          </div>
+
+          {/* Grouped bar — bugs opened vs closed per week */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem 1.25rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Bugs Opened vs Closed — last 8 weeks
+            </div>
+            <BugsWeeklyChart data={trends.bugsWeekly} />
+          </div>
+
+          {/* Coverage donut — test cases by status */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1rem 1.25rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Test Coverage
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <CoverageDonutChart data={trends.coverageByStatus} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
+                {(trends.coverageByStatus ?? []).map(d => (
+                  <LegendItem
+                    key={d.status}
+                    color={COVERAGE_COLOR[d.status] ?? '#e5e7eb'}
+                    label={d.status.charAt(0).toUpperCase() + d.status.slice(1)}
+                    count={d.count}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* Empty state */}
       {isEmpty && (
