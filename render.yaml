@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: verity
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/hello
+    envVars:
+      - key: NODE_ENV
+        value: production

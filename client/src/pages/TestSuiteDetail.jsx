@@ -119,10 +119,10 @@ export default function TestSuiteDetail() {
   const inSuiteIds = new Set(cases.map(c => c.id));
   const available = allCases.filter(c => !inSuiteIds.has(c.id));
 
-  if (loading) return <div style={{ padding: '2rem', color: '#9ca3af' }}>Loading…</div>;
-  if (loadError) return <div style={{ padding: '2rem', color: '#ef4444' }}>{loadError}</div>;
+  if (loading) return <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto', color: '#9ca3af' }}>Loading…</div>;
+  if (loadError) return <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto', color: '#ef4444' }}>{loadError}</div>;
   if (notFound) return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
       <p>Suite not found.</p>
       <Link to="/test-suites" style={{ color: '#2563eb' }}>← Back to suites</Link>
     </div>

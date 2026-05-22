@@ -126,13 +126,13 @@ export default function BugDetail() {
   }
 
   if (loadError) return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
       <button onClick={() => navigate('/bugs')} style={backBtn}>← Bugs</button>
       <p style={{ color: '#ef4444' }}>{loadError}</p>
     </div>
   );
 
-  if (!bug) return <div style={{ padding: '2rem', color: '#9ca3af' }}>Loading…</div>;
+  if (!bug) return <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto', color: '#9ca3af' }}>Loading…</div>;
 
   const allowed = STATUS_TRANSITIONS[bug.status] ?? [];
 

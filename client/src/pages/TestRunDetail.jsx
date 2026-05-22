@@ -86,13 +86,13 @@ export default function TestRunDetail() {
   }
 
   if (loadError) return (
-    <div style={{ padding: '2rem' }}>
+    <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto' }}>
       <button onClick={() => navigate('/test-runs')} style={backBtn}>← Test Runs</button>
       <p style={{ color: '#ef4444' }}>{loadError}</p>
     </div>
   );
 
-  if (!run) return <div style={{ padding: '2rem', color: '#9ca3af' }}>Loading…</div>;
+  if (!run) return <div style={{ padding: '2rem', maxWidth: 1100, margin: '0 auto', color: '#9ca3af' }}>Loading…</div>;
 
   const total = run.results.length;
 

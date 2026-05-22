@@ -49,7 +49,7 @@ export default function Settings() {
     }
   }
 
-  if (!form) return <div style={{ padding: '2rem', color: '#9ca3af' }}>Loading…</div>;
+  if (!form) return <div style={{ padding: '2rem', maxWidth: 640, margin: '0 auto', color: '#9ca3af' }}>Loading…</div>;
 
   return (
     <div style={{ padding: '2rem', maxWidth: 640, margin: '0 auto' }}>

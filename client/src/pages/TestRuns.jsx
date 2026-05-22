@@ -35,7 +35,7 @@ export default function TestRuns() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: '2rem', color: '#9ca3af' }}>Loading…</div>;
+  if (loading) return <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto', color: '#9ca3af' }}>Loading…</div>;
 
   return (
     <div style={{ padding: '2rem', maxWidth: 960, margin: '0 auto' }}>
